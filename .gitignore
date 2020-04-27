@@ -3,3 +3,7 @@
 ################################################################################
 
 /CADApp.vcxproj.filters
+/CADApp.vcxproj
+/CADApp.vcxproj.user
+/Debug/CADApp.tlog
+/Debug
