@@ -9,10 +9,6 @@
 
 //static variables
 
-float sShape::worldScale = 1.0f;
-
-
-
 class CADApplication : public olc::PixelGameEngine {
 
 public:
@@ -27,12 +23,17 @@ private:
     olc::vf2d vStartPan = { 0.0f, 0.0f };
 
 
+
+
     float fScale = 10.0f;
     float fGrid = 1.0f;
+
+
+    olc::vf2d vCursor = { 0,0 };
     
     //convert coordinates from world space to screenspace
 
-    void WorldtoScreen(const olc::vf2d &v, int &nScreenX, int &nScreenY) 
+    void WorldToScreen(const olc::vf2d &v, int &nScreenX, int &nScreenY) 
     {
         nScreenX = (int)((v.x - vOffset.x) * fScale);
         nScreenY = (int)((v.y - vOffset.y) * fScale);
@@ -61,22 +62,93 @@ public:
 
     bool OnUserUpdate(float fElapsedTime) override
     {
-        
-        //get the mouse coordinates
-        olc::vf2d vMouse = {(float)GetMouseX(), (float)GetMouseY() };
+        olc::vf2d vMouse = { (float)GetMouseX(), (float)GetMouseY() };
 
-        //handle pan and zoom
+
+        // Handle Pan & Zoom
         if (GetMouse(2).bPressed)
         {
             vStartPan = vMouse;
-
         }
-        if (GetMouse(2).bHeld) {
+
+        if (GetMouse(2).bHeld)
+        {
             vOffset -= (vMouse - vStartPan) / fScale;
             vStartPan = vMouse;
         }
 
         olc::vf2d vMouseBeforeZoom;
+        ScreenToWorld((int)vMouse.x, (int)vMouse.y, vMouseBeforeZoom);
+
+        if (GetKey(olc::Key::Q).bHeld || GetMouseWheel() > 0)
+        {
+            fScale *= 1.1f;
+        }
+
+        if (GetKey(olc::Key::A).bHeld || GetMouseWheel() < 0)
+        {
+            fScale *= 0.9f;
+        }
+
+        olc::vf2d vMouseAfterZoom;
+        ScreenToWorld((int)vMouse.x, (int)vMouse.y, vMouseAfterZoom);
+        vOffset += (vMouseBeforeZoom - vMouseAfterZoom);
+
+
+        //snap cursor to the screen, basically make it so the cursor value can only be a whole number so it will 
+        //be on a grid line
+        // Snap mouse cursor to nearest grid interval
+        vCursor.x = floorf((vMouseAfterZoom.x + 0.5f) * fGrid);
+        vCursor.y = floorf((vMouseAfterZoom.y + 0.5f) * fGrid);
+
+
+
+        // Clear Screen
+        Clear(olc::WHITE);
+
+        int sx, sy;
+        int ex, ey;
+
+        // Get visible world
+        olc::vf2d vWorldTopLeft, vWorldBottomRight;
+        ScreenToWorld(0, 0, vWorldTopLeft);
+        ScreenToWorld(ScreenWidth(), ScreenHeight(), vWorldBottomRight);
+
+        // Get values just beyond screen boundaries
+        vWorldTopLeft.x = floor(vWorldTopLeft.x);
+        vWorldTopLeft.y = floor(vWorldTopLeft.y);
+        vWorldBottomRight.x = ceil(vWorldBottomRight.x);
+        vWorldBottomRight.y = ceil(vWorldBottomRight.y);
+
+        // Draw Grid dots
+        for (float x = vWorldTopLeft.x; x < vWorldBottomRight.x; x += fGrid)
+        {
+            for (float y = vWorldTopLeft.y; y < vWorldBottomRight.y; y += fGrid)
+            {
+                WorldToScreen({ x, y }, sx, sy);
+                Draw(sx, sy, olc::BLUE);
+            }
+        }
+
+
+
+
+        // Draw World Axis
+        WorldToScreen({ 0,vWorldTopLeft.y }, sx, sy);
+        WorldToScreen({ 0,vWorldBottomRight.y }, ex, ey);
+        DrawLine(sx, sy, ex, ey, olc::GREY, 0xF0F0F0F0);
+        WorldToScreen({ vWorldTopLeft.x,0 }, sx, sy);
+        WorldToScreen({ vWorldBottomRight.x,0 }, ex, ey);
+        DrawLine(sx, sy, ex, ey, olc::GREY, 0xF0F0F0F0);
+
+        //draw cursor
+
+        WorldToScreen(vCursor, sx, sy);
+        DrawCircle(sx, sy, 3, olc::YELLOW);
+
+        return true;
+
+
 
     
     }
@@ -90,7 +162,11 @@ public:
 
 int main()
 {
-    std::cout << "Hello World!\n";
+    
+    CADApplication bob;
+    if (bob.Construct(1600, 960, 1, 1, false))
+        bob.Start();
+    return 0;
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
